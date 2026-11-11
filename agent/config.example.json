@@ -1,0 +1,4 @@
+{
+  "supabaseUrl": "https://YOUR-PROJECT.supabase.co",
+  "anonKey": "your-anon-key (public key, NOT the service role key)"
+}
