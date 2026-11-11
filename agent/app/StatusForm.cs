@@ -228,8 +228,8 @@ namespace ClassLock
                 detail += "\r\nInstalling apps is always blocked.\r\n";
             if (!Json.Bool(s, "online")) detail += "\r\nOffline. The last class rules stay on.";
             if (isAdmin)
-                detail += "\r\nWARNING: this Windows account is an administrator. ClassLock never locks " +
-                          "administrators. Students must use a standard Windows account.";
+                detail += "\r\nWARNING: this Windows account is an administrator. It is locked during class, " +
+                          "but while unlocked it can remove ClassLock. Students should use a standard Windows account.";
             detailLabel.Text = detail;
             string tip = "ClassLock: " + (locked ? "locked" : "unlocked");
             tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
@@ -244,13 +244,15 @@ namespace ClassLock
 
             // Locked: full-screen Chrome only. No desktop, taskbar or Start menu (the
             // service closes them), and the keys that close Chrome or switch programs
-            // do nothing. Administrators are never locked.
-            bool kiosk = locked && !isAdmin;
+            // do nothing. This applies to every Windows account, administrators too.
+            bool kiosk = locked;
             timer.Interval = kiosk ? 1000 : 3000;
             KeyBlocker.Active = kiosk;
             if (kiosk)
             {
                 desktopHidden = true;
+                if (Visible) Hide(); // only the class website is on the screen
+                TopMost = false;
                 if (home != null) KeepChromeOpen(home);
             }
             else
@@ -322,14 +324,39 @@ namespace ClassLock
         void KeepChromeOpen(string home)
         {
             if (DateTime.UtcNow - lastChromeLaunch < TimeSpan.FromSeconds(3)) return;
-            int session = Process.GetCurrentProcess().SessionId;
+            int session;
+            using (Process me = Process.GetCurrentProcess()) session = me.SessionId;
+
+            // A Chrome window is open: nothing to do. Chrome processes without any
+            // window (background mode, stuck start) would swallow the kiosk start, so
+            // they are ended first, but only after a slow start had 10 seconds.
+            var windowless = new List<Process>();
+            bool window = false;
             foreach (Process p in Process.GetProcessesByName("chrome"))
             {
-                using (p)
+                if (p.SessionId != session) { p.Dispose(); continue; }
+                try { if (p.MainWindowHandle != IntPtr.Zero) window = true; }
+                catch (Exception) { /* ended meanwhile */ }
+                windowless.Add(p);
+            }
+            try
+            {
+                if (window) return;
+                if (windowless.Count > 0)
                 {
-                    if (p.SessionId == session) return;
+                    if (DateTime.UtcNow - lastChromeLaunch < TimeSpan.FromSeconds(10)) return;
+                    foreach (Process p in windowless)
+                    {
+                        try { p.Kill(); } catch (Exception) { /* ended meanwhile */ }
+                    }
+                    Thread.Sleep(500);
                 }
             }
+            finally
+            {
+                foreach (Process p in windowless) p.Dispose();
+            }
+
             string chrome = FindChrome();
             if (chrome == null) return;
             lastChromeLaunch = DateTime.UtcNow;

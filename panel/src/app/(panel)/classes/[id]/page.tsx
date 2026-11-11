@@ -306,7 +306,7 @@ export default function ClassPage() {
                         {d.is_locked ? 'Locked' : 'Unlocked'}
                         {d.agent_version?.endsWith(' admin') && (
                           <span className="block text-xs text-danger font-semibold">
-                            Admin Windows account: NOT protected. Use a standard account.
+                            Admin Windows account: locked in class, but can remove ClassLock when unlocked.
                           </span>
                         )}
                       </td>

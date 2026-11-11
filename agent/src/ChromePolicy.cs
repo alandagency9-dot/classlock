@@ -34,8 +34,45 @@ namespace ClassLock
         {
             "RestoreOnStartup", "HomepageLocation", "HomepageIsNewTabPage", "ShowHomeButton",
             "IncognitoModeAvailability", "BrowserGuestModeEnabled", "BrowserAddPersonEnabled",
-            "DeveloperToolsAvailability", "DownloadRestrictions"
+            "DeveloperToolsAvailability", "DownloadRestrictions",
+            "PrintingEnabled", "AllowFileSelectionDialogs", "TaskManagerEndProcessEnabled", "BackgroundModeEnabled"
         };
+
+        // Standard Windows group policies, set only while locked (machine-wide, all users).
+        const string SystemPolicyKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
+        const string ExplorerPolicyKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer";
+        const string EdgeUiKey = @"SOFTWARE\Policies\Microsoft\Windows\EdgeUI";
+
+        /// <summary>
+        /// While locked: Task Manager is disabled, the Shut down / Restart buttons are
+        /// hidden (Ctrl+Alt+Del screen and sign-in screen), Switch user and Change
+        /// password are hidden, and touch edge swipes do nothing. Removed on unlock.
+        /// Shutting down would not escape the lock anyway: the laptop starts locked.
+        /// </summary>
+        public static void SetWindowsLock(bool on)
+        {
+            using (RegistryKey hklm = Hklm())
+            {
+                using (RegistryKey sys = hklm.CreateSubKey(SystemPolicyKey))
+                {
+                    SetOrDelete(sys, "DisableTaskMgr", on, 1);
+                    SetOrDelete(sys, "HideFastUserSwitching", on, 1);
+                    SetOrDelete(sys, "DisableChangePassword", on, 1);
+                    // 0 hides the power button on the sign-in screen; Windows' own default is 1.
+                    sys.SetValue("shutdownwithoutlogon", on ? 0 : 1, RegistryValueKind.DWord);
+                }
+                using (RegistryKey explorer = hklm.CreateSubKey(ExplorerPolicyKey))
+                    SetOrDelete(explorer, "NoClose", on, 1);
+                using (RegistryKey edge = hklm.CreateSubKey(EdgeUiKey))
+                    SetOrDelete(edge, "AllowEdgeSwipe", on, 0);
+            }
+        }
+
+        static void SetOrDelete(RegistryKey key, string name, bool set, int value)
+        {
+            if (set) key.SetValue(name, value, RegistryValueKind.DWord);
+            else key.DeleteValue(name, false);
+        }
         static readonly string[] LockLists = { "URLBlocklist", "URLAllowlist", "RestoreOnStartupURLs" };
 
         static RegistryKey Hklm()
@@ -81,6 +118,12 @@ namespace ClassLock
                 chrome.SetValue("BrowserAddPersonEnabled", 0, RegistryValueKind.DWord);
                 chrome.SetValue("DeveloperToolsAvailability", 2, RegistryValueKind.DWord);
                 chrome.SetValue("DownloadRestrictions", 3, RegistryValueKind.DWord);
+                // No print or file dialogs: they can browse the disk.
+                chrome.SetValue("PrintingEnabled", 0, RegistryValueKind.DWord);
+                chrome.SetValue("AllowFileSelectionDialogs", 0, RegistryValueKind.DWord);
+                chrome.SetValue("TaskManagerEndProcessEnabled", 0, RegistryValueKind.DWord);
+                // No hidden Chrome left running after its window closes.
+                chrome.SetValue("BackgroundModeEnabled", 0, RegistryValueKind.DWord);
                 if (home != null)
                 {
                     chrome.SetValue("RestoreOnStartup", 4, RegistryValueKind.DWord);
@@ -114,6 +157,7 @@ namespace ClassLock
         {
             ClearLock();
             SetShellAutoRestart(true);
+            SetWindowsLock(false);
             using (RegistryKey hklm = Hklm())
             {
                 using (RegistryKey chrome = hklm.OpenSubKey(ChromeKey, true))

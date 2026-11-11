@@ -22,14 +22,16 @@ It has three parts:
    - The keys that close Chrome or switch programs do nothing (Alt+F4, Ctrl+W, Alt+Tab, the Windows key, ...).
    - Chrome opens only the allowed websites. Downloads, incognito, guest mode, extensions and developer tools are off.
    - If Chrome closes anyway, it opens again within about 3 seconds.
-   - On unlock, Chrome closes and the normal desktop comes back.
+   - Task Manager, Shut down / Restart, Switch user and touch edge swipes are turned off (standard Windows policies). Turning the laptop off with the power button does not help: it starts locked again.
+   - Chrome cannot print or open file dialogs.
+   - On unlock, Chrome closes, these policies are removed and the normal desktop comes back.
 6. All the time (locked or not):
    - Programs run only from `C:\Windows` and `C:\Program Files`. Downloaded installers, portable apps, apps from USB drives and apps in the user's folders are closed right away.
    - The Microsoft Store, `winget`, `msiexec`, `cmd`, PowerShell and script hosts are blocked.
    - Chrome extensions are blocked.
 7. A connected laptop cannot change its class by itself. To move it, the teacher clicks **Remove** in the panel, then the new class code is typed on the laptop.
 
-Administrator accounts are never blocked, so IT can still install and fix things.
+While **unlocked**, administrator accounts are never blocked, so IT can install and fix things. While **locked**, the lock applies to every account, administrators too. To work on a locked laptop, IT first unlocks it in the panel.
 
 ## Requirements
 
@@ -108,7 +110,8 @@ If a needed program is blocked, an administrator adds its file name or full path
 - **Sites that need another site.** If the class website signs in with Google, also allow `accounts.google.com`. If a page looks broken, add the other site it loads.
 - **Ctrl+Alt+Del cannot be blocked** by any program. It only offers lock, sign out and Task Manager, and Task Manager closes at once.
 - **If a student ends the ClassLock app** (possible while unlocked), the service starts it again within about a second.
-- **Administrator accounts are never locked**, and an administrator can remove ClassLock. The panel shows "Admin Windows account: NOT protected" for such a laptop.
+- **Administrator accounts are locked during class, but while unlocked an administrator can remove ClassLock.** The panel shows a warning for such a laptop. Students should use standard Windows accounts.
+- **A locked laptop without internet** cannot be unlocked from the panel. IT can start it in Safe Mode (ClassLock does not run there) and run `ClassLockSetup.exe /uninstall`.
 - **Blocking is fast, but it is not instant.** A blocked program can show for less than a second before it closes. For the strongest protection on Windows Education or Enterprise, IT can also turn on AppLocker with its default rules.
 - **Time zone.** Class times use the laptop's clock. Students cannot change it, because standard users cannot set the time.
 

@@ -42,6 +42,7 @@ namespace ClassLock
                 if (locked) ChromePolicy.ApplyLock(sites);
                 else ChromePolicy.ClearLock();
                 ChromePolicy.SetShellAutoRestart(!locked);
+                ChromePolicy.SetWindowsLock(locked);
                 appliedLocked = locked;
                 appliedSites = sitesKey;
                 Log.Write(locked ? "Locked. Allowed sites: " + sitesKey.Replace("\n", ", ") : "Unlocked.");
@@ -154,7 +155,10 @@ namespace ClassLock
                     bool tokenSaysAdmin;
                     string sid = Native.ProcessOwner(p.Id, out tokenSaysAdmin);
                     if (!Native.IsPersonSid(sid)) continue;           // SYSTEM and services are never stopped
-                    if (IsAdmin(sid, tokenSaysAdmin)) continue;      // teachers and IT are never stopped
+                    // Unlocked: administrators (IT) are never stopped, so they can install and fix things.
+                    // Locked: the class lock applies to whoever is at the laptop, administrators too.
+                    // IT unlocks the laptop in the panel first to work on it.
+                    if (!locked && IsAdmin(sid, tokenSaysAdmin)) continue;
 
                     if (Native.Kill(p.Id)) LogStopped(path, v.Reason);
                 }

@@ -17,7 +17,7 @@ New-Item -ItemType Directory -Force $obj, $dist | Out-Null
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path $csc)) { throw "C# compiler not found at $csc" }
 
-$version = '1.2.0'
+$version = '1.3.0'
 $configPath = Join-Path $root 'config.json'
 $haveConfig = Test-Path $configPath
 if ($haveConfig) {
