@@ -36,10 +36,12 @@ namespace ClassLock
             if (appliedLocked == locked && (!locked || appliedSites == sitesKey)) return;
 
             bool becameLocked = locked && appliedLocked != true;
+            bool becameUnlocked = !locked && appliedLocked == true;
             try
             {
                 if (locked) ChromePolicy.ApplyLock(sites);
                 else ChromePolicy.ClearLock();
+                ChromePolicy.SetShellAutoRestart(!locked);
                 appliedLocked = locked;
                 appliedSites = sitesKey;
                 Log.Write(locked ? "Locked. Allowed sites: " + sitesKey.Replace("\n", ", ") : "Unlocked.");
@@ -50,9 +52,10 @@ namespace ClassLock
                 return;
             }
 
-            // Close Chrome once so open tabs on other sites are gone.
-            // The ClassLock app opens Chrome again on the allowed site.
-            if (becameLocked) StopUserProcesses("chrome");
+            // Lock: close Chrome once so open tabs on other sites are gone. The ClassLock
+            // app opens it again full screen (kiosk) on the allowed site.
+            // Unlock: close the full-screen Chrome so the student gets a normal Chrome.
+            if (becameLocked || becameUnlocked) StopUserProcesses("chrome");
         }
 
         void StopUserProcesses(string name)
@@ -91,9 +94,51 @@ namespace ClassLock
             Log.Write("Stopped " + path + " (" + reason + ")");
         }
 
+        /// <summary>
+        /// True when the last scan found a signed-in Windows account that is an
+        /// administrator. ClassLock never blocks administrators, so such a laptop is
+        /// not protected. The teacher panel shows a warning for it.
+        /// </summary>
+        public volatile bool AdminSignedIn;
+
+        SessionLauncher launcher;
+
+        /// <summary>Sessions where the ClassLock app (from the install folder) runs.</summary>
+        HashSet<int> AppSessions()
+        {
+            var sessions = new HashSet<int>();
+            bool admin = false;
+            string appExe = System.IO.Path.Combine(paths.InstallDir, "ClassLock.exe");
+            foreach (Process p in Process.GetProcessesByName("ClassLock"))
+            {
+                using (p)
+                {
+                    try
+                    {
+                        if (p.SessionId != 0 && string.Equals(Native.ProcessPath(p.Id), appExe, StringComparison.OrdinalIgnoreCase))
+                        {
+                            sessions.Add(p.SessionId);
+                            bool isAdmin;
+                            if (Native.IsPersonSid(Native.ProcessOwner(p.Id, out isAdmin)) && isAdmin) admin = true;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // The process ended while we looked at it.
+                    }
+                }
+            }
+            AdminSignedIn = admin;
+            return sessions;
+        }
+
         /// <summary>One pass over all programs in user sessions.</summary>
         public void Scan(bool locked)
         {
+            HashSet<int> appSessions = AppSessions();
+            if (launcher == null) launcher = new SessionLauncher(System.IO.Path.Combine(paths.InstallDir, "ClassLock.exe"));
+            try { launcher.EnsureRunning(appSessions); }
+            catch (Exception e) { Log.Write("Session check failed: " + e.Message); }
             Process[] all = Process.GetProcesses();
             foreach (Process p in all)
             {
@@ -102,6 +147,8 @@ namespace ClassLock
                     if (p.SessionId == 0) continue; // services; this agent runs here too
                     string path = Native.ProcessPath(p.Id);
                     Verdict v = rules.Decide(path, locked);
+                    if (v.Allow && rules.HideDesktop(path, locked, appSessions.Contains(p.SessionId)))
+                        v = Verdict.No("desktop hidden during class");
                     if (v.Allow) continue;
 
                     bool tokenSaysAdmin;

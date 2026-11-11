@@ -184,6 +184,9 @@ namespace ClassLock
             }
             catch (Exception)
             {
+                // Without the service nothing is enforced: give the student a normal desktop.
+                KeyBlocker.Active = false;
+                EnsureDesktop();
                 stateLabel.Text = "Service not running";
                 stateLabel.ForeColor = Color.Firebrick;
                 detailLabel.Text = "The ClassLock service is not running on this laptop. Tell your teacher.";
@@ -202,6 +205,8 @@ namespace ClassLock
 
             if (!registered)
             {
+                KeyBlocker.Active = false;
+                EnsureDesktop();
                 if (first || wasRegistered)
                 {
                     ShowPanel(false);
@@ -222,6 +227,9 @@ namespace ClassLock
             else
                 detail += "\r\nInstalling apps is always blocked.\r\n";
             if (!Json.Bool(s, "online")) detail += "\r\nOffline. The last class rules stay on.";
+            if (isAdmin)
+                detail += "\r\nWARNING: this Windows account is an administrator. ClassLock never locks " +
+                          "administrators. Students must use a standard Windows account.";
             detailLabel.Text = detail;
             string tip = "ClassLock: " + (locked ? "locked" : "unlocked");
             tray.Text = tip.Length > 63 ? tip.Substring(0, 63) : tip;
@@ -234,12 +242,86 @@ namespace ClassLock
             }
             lastLocked = locked;
 
-            if (locked && home != null) KeepChromeOpen(home);
+            // Locked: full-screen Chrome only. No desktop, taskbar or Start menu (the
+            // service closes them), and the keys that close Chrome or switch programs
+            // do nothing. Administrators are never locked.
+            bool kiosk = locked && !isAdmin;
+            timer.Interval = kiosk ? 1000 : 3000;
+            KeyBlocker.Active = kiosk;
+            if (kiosk)
+            {
+                desktopHidden = true;
+                if (home != null) KeepChromeOpen(home);
+            }
+            else
+            {
+                EnsureDesktop();
+            }
+        }
+
+        readonly bool isAdmin = CurrentUserIsAdmin();
+        readonly DateTime startedUtc = DateTime.UtcNow;
+        bool desktopHidden;
+        DateTime lastDesktopStart = DateTime.MinValue;
+
+        static bool CurrentUserIsAdmin()
+        {
+            try
+            {
+                bool admin;
+                using (Process me = Process.GetCurrentProcess()) Native.ProcessOwner(me.Id, out admin);
+                return admin;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        static bool RunsInMySession(string name)
+        {
+            int session;
+            using (Process me = Process.GetCurrentProcess()) session = me.SessionId;
+            foreach (Process p in Process.GetProcessesByName(name))
+            {
+                using (p)
+                {
+                    if (p.SessionId == session) return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Starts the desktop and taskbar again after a lock. Also when this app was
+        /// started while the desktop was missing (for example the service restarted it).
+        /// Not in the first 20 seconds after sign-in, when Windows starts it by itself.
+        /// </summary>
+        void EnsureDesktop()
+        {
+            if (!desktopHidden && DateTime.UtcNow - startedUtc < TimeSpan.FromSeconds(20)) return;
+            if (RunsInMySession("explorer"))
+            {
+                desktopHidden = false;
+                return;
+            }
+            if (DateTime.UtcNow - lastDesktopStart < TimeSpan.FromSeconds(5)) return;
+            lastDesktopStart = DateTime.UtcNow;
+            try
+            {
+                var psi = new ProcessStartInfo(Path.Combine(SystemPaths.Current().Windows, "explorer.exe"));
+                psi.UseShellExecute = false;
+                Process.Start(psi);
+            }
+            catch (Exception)
+            {
+                // Try again on the next tick.
+            }
         }
 
         void KeepChromeOpen(string home)
         {
-            if (DateTime.UtcNow - lastChromeLaunch < TimeSpan.FromSeconds(10)) return;
+            if (DateTime.UtcNow - lastChromeLaunch < TimeSpan.FromSeconds(3)) return;
             int session = Process.GetCurrentProcess().SessionId;
             foreach (Process p in Process.GetProcessesByName("chrome"))
             {
@@ -253,7 +335,9 @@ namespace ClassLock
             lastChromeLaunch = DateTime.UtcNow;
             try
             {
-                var psi = new ProcessStartInfo(chrome, "--start-maximized \"" + home.Replace("\"", "") + "\"");
+                // Kiosk: full screen, no tabs, no address bar, no close button.
+                var psi = new ProcessStartInfo(chrome, "--kiosk --no-first-run --no-default-browser-check \"" +
+                    home.Replace("\"", "") + "\"");
                 psi.UseShellExecute = false;
                 Process.Start(psi);
             }

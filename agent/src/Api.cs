@@ -67,13 +67,14 @@ namespace ClassLock
             return Post("/rest/v1/rpc/register_device", body, null);
         }
 
-        public static Dictionary<string, object> Heartbeat(string deviceId, string secret, bool isLocked)
+        /// <summary>adminSignedIn adds " admin" to the version, so the panel can warn the teacher.</summary>
+        public static Dictionary<string, object> Heartbeat(string deviceId, string secret, bool isLocked, bool adminSignedIn)
         {
             var body = new Dictionary<string, object>();
             body["p_device_id"] = deviceId;
             body["p_secret"] = secret;
             body["p_is_locked"] = isLocked;
-            body["p_version"] = BuildConfig.Version;
+            body["p_version"] = BuildConfig.Version + (adminSignedIn ? " admin" : "");
             return Post("/rest/v1/rpc/device_heartbeat", body, null);
         }
     }

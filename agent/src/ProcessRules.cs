@@ -122,6 +122,18 @@ namespace ClassLock
             return slash < 0 ? rest : rest.Substring(0, slash);
         }
 
+        /// <summary>
+        /// While locked, the desktop, taskbar and Start menu (explorer.exe) are closed,
+        /// so only Chrome is on the screen. This happens only in a session where the
+        /// ClassLock app runs: the app keeps Chrome open there and starts the desktop
+        /// again on unlock. Without the app the student would see a black screen.
+        /// </summary>
+        public bool HideDesktop(string path, bool locked, bool appRunsInSession)
+        {
+            return locked && appRunsInSession && !string.IsNullOrEmpty(path)
+                && string.Equals(path, Path.Combine(paths.Windows, "explorer.exe"), StringComparison.OrdinalIgnoreCase);
+        }
+
         public Verdict Decide(string path, bool locked)
         {
             if (string.IsNullOrEmpty(path)) return Verdict.Yes(); // cannot identify: leave alone

@@ -136,6 +136,10 @@ namespace ClassLock.Tests
             Check(rules.Decide(@"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe", true).Allow, "chrome x86 allowed");
             Check(rules.Decide(@"C:\Program Files\ClassLock\ClassLock.exe", true).Allow, "own app allowed");
             Check(rules.Decide(@"C:\Windows\explorer.exe", true).Allow, "explorer allowed locked");
+            Check(rules.HideDesktop(@"C:\Windows\explorer.exe", true, true), "desktop hidden when locked and app runs");
+            Check(!rules.HideDesktop(@"C:\Windows\explorer.exe", true, false), "desktop kept when app is not running");
+            Check(!rules.HideDesktop(@"C:\Windows\explorer.exe", false, true), "desktop kept when unlocked");
+            Check(!rules.HideDesktop(@"C:\Windows\System32\ctfmon.exe", true, true), "only explorer is hidden");
             Check(rules.Decide(@"C:\Windows\System32\ctfmon.exe", true).Allow, "keyboard host allowed locked");
 
             string notepad = @"C:\Windows\System32\notepad.exe";

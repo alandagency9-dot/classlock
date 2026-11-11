@@ -14,6 +14,20 @@ namespace ClassLock
         const string ChromeKey = @"SOFTWARE\Policies\Google\Chrome";
         const string InstallerKey = @"SOFTWARE\Policies\Microsoft\Windows\Installer";
         const string StoreKey = @"SOFTWARE\Policies\Microsoft\WindowsStore";
+        const string WinlogonKey = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon";
+
+        /// <summary>
+        /// Windows starts the desktop (explorer.exe) again when it closes. While locked,
+        /// ClassLock closes it on purpose, so this is off; it is on again when unlocked.
+        /// </summary>
+        public static void SetShellAutoRestart(bool on)
+        {
+            using (RegistryKey hklm = Hklm())
+            using (RegistryKey winlogon = hklm.OpenSubKey(WinlogonKey, true))
+            {
+                if (winlogon != null) winlogon.SetValue("AutoRestartShell", on ? 1 : 0, RegistryValueKind.DWord);
+            }
+        }
 
         // Values written only while locked.
         static readonly string[] LockValues =
@@ -99,6 +113,7 @@ namespace ClassLock
         public static void RemoveAll()
         {
             ClearLock();
+            SetShellAutoRestart(true);
             using (RegistryKey hklm = Hklm())
             {
                 using (RegistryKey chrome = hklm.OpenSubKey(ChromeKey, true))

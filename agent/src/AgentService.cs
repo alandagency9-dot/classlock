@@ -80,7 +80,7 @@ namespace ClassLock
             while (!stopping)
             {
                 Heartbeat();
-                heartbeatNow.WaitOne(10000);
+                heartbeatNow.WaitOne(5000);
             }
         }
 
@@ -98,7 +98,7 @@ namespace ClassLock
 
             try
             {
-                Dictionary<string, object> res = Api.Heartbeat(id, secret, locked);
+                Dictionary<string, object> res = Api.Heartbeat(id, secret, locked, enforcer != null && enforcer.AdminSignedIn);
                 Policy p = Policy.FromHeartbeat(res);
                 lock (gate)
                 {

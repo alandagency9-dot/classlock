@@ -302,7 +302,14 @@ export default function ClassPage() {
                         <span className={`inline-block w-2 h-2 rounded-full mr-2 ${seen.online ? 'bg-ok' : 'bg-muted'}`} />
                         {seen.text}
                       </td>
-                      <td className="py-2 pr-4">{d.is_locked ? 'Locked' : 'Unlocked'}</td>
+                      <td className="py-2 pr-4">
+                        {d.is_locked ? 'Locked' : 'Unlocked'}
+                        {d.agent_version?.endsWith(' admin') && (
+                          <span className="block text-xs text-danger font-semibold">
+                            Admin Windows account: NOT protected. Use a standard account.
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2 pr-4">
                         <select className="input w-auto py-1" value={d.lock_mode}
                           onChange={(e) => setDeviceMode(d, e.target.value as DeviceLockMode)}>
