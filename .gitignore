@@ -7,3 +7,4 @@ out/
 agent/config.json
 agent/obj/
 agent/dist/
+teacher-html/dist/

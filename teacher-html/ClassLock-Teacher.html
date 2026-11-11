@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClassLock Teacher Panel</title>
+<style>
+  :root {
+    --bg: #f5f6fa; --surface: #fff; --alt: #eef0f6; --border: #dde1ea; --fg: #172033; --muted: #5b6478;
+    --brand: #2f5bd3; --brand-dark: #2248ad; --danger: #c2362b; --ok: #1f8a4c;
+    --bad-bg: #fbe9e7; --ok-bg: #e5f5ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11151f; --surface: #1a2030; --alt: #232b3f; --border: #2f3951; --fg: #e8ecf6; --muted: #9aa5bf;
+      --brand: #6f93f5; --brand-dark: #8aa8f8; --danger: #ff7b6e; --ok: #5ccf8b; --bad-bg: #3a1f1d; --ok-bg: #173323; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, "Segoe UI", Arial, sans-serif; line-height: 1.45; }
+  h1 { font-size: 1.5rem; margin: 0; } h2 { font-size: 1.05rem; margin: 0; }
+  a { color: var(--brand); text-decoration: none; font-weight: 600; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .bar { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .bar .wrap { display: flex; align-items: center; gap: 16px; padding-top: 12px; padding-bottom: 12px; }
+  .brand { font-weight: 800; font-size: 1.1rem; } .grow { flex: 1; }
+  .muted { color: var(--muted); font-size: .9rem; } .small { font-size: .8rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .grid { display: grid; gap: 16px; } .g3 { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .cols3 { grid-template-columns: 1fr 2fr; } .cols2 { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 800px) { .cols3, .cols2 { grid-template-columns: 1fr; } }
+  .stack { display: flex; flex-direction: column; gap: 18px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  input, select, textarea { font: inherit; color: var(--fg); background: var(--alt); border: 1px solid var(--border); border-radius: 12px; padding: 9px 12px; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--brand); }
+  input.full, textarea { width: 100%; } textarea { min-height: 140px; font-family: Consolas, monospace; font-size: .9rem; }
+  .btn { font: inherit; font-weight: 600; font-size: .9rem; border: 1px solid var(--brand); background: var(--brand); color: #fff; border-radius: 12px; padding: 9px 16px; cursor: pointer; }
+  .btn:hover { background: var(--brand-dark); } .btn:disabled { opacity: .6; cursor: default; }
+  .btn.ghost { background: transparent; color: var(--brand); } .btn.ghost:hover { background: var(--alt); }
+  .btn.danger { background: transparent; color: var(--danger); border-color: var(--danger); } .btn.danger:hover { background: var(--bad-bg); }
+  .link { background: none; border: 0; padding: 4px; font: inherit; font-size: .9rem; color: var(--danger); cursor: pointer; }
+  .badge { font-size: .75rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+  .badge.locked { background: var(--bad-bg); color: var(--danger); } .badge.open { background: var(--ok-bg); color: var(--ok); }
+  .code { font-family: Consolas, monospace; font-size: 2.2rem; font-weight: 800; letter-spacing: .25em; margin: 0; }
+  .classcard { cursor: pointer; } .classcard:hover { border-color: var(--brand); }
+  .msg { border-radius: 12px; padding: 9px 14px; font-size: .9rem; } .msg.ok { background: var(--ok-bg); color: var(--ok); } .msg.bad { background: var(--bad-bg); color: var(--danger); }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; } th { text-align: left; color: var(--muted); font-weight: 500; padding: 6px 12px 6px 0; }
+  td { border-top: 1px solid var(--border); padding: 8px 12px 8px 0; vertical-align: top; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--muted); } .dot.on { background: var(--ok); }
+  .warn { display: block; color: var(--danger); font-size: .78rem; font-weight: 600; }
+  .login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .login form { width: 100%; max-width: 380px; padding: 28px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+'use strict';
+// The URL and the anon key are PUBLIC values (they are also inside the laptop app).
+// Never put the service_role key in this file.
+var SUPABASE_URL = 'https://tjsgelvekhguoicrisqu.supabase.co';
+var ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqc2dlbHZla2hndW9pY3Jpc3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0MTQwMjQsImV4cCI6MjEwOTk5MDAyNH0.iLlxa9Dl8pEaRcH9nY1TbjrCvzO6ZaD6hpHeKFeyiiM';
+
+var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+var ONLINE_SECONDS = 45;
+var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+var DEVICE_COLUMNS = 'id,machine_id,class_id,hostname,lock_mode,is_locked,agent_version,last_seen,registered_at';
+
+var app = document.getElementById('app');
+var session = null, teacher = null, timer = null;
+var view = { classId: null, editorsReady: false, schedule: [], overrideFor: 'forever', cls: null, devices: [] };
+
+// ---------------------------------------------------------------- helpers
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function $(id) { return document.getElementById(id); }
+function store(key, value) {
+  try {
+    if (value === undefined) return localStorage.getItem(key);
+    if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+  } catch (e) { /* storage blocked: the login just is not remembered */ }
+  return null;
+}
+function randomCode() {
+  var bytes = crypto.getRandomValues(new Uint8Array(6)), out = '';
+  for (var i = 0; i < bytes.length; i++) out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  return out;
+}
+
+// ---------------------------------------------------------------- lock rules (same as the laptop app)
+function toMinutes(hhmm) {
+  var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm).trim());
+  if (!m) return null;
+  var h = Number(m[1]), min = Number(m[2]);
+  if (h > 24 || min > 59 || (h === 24 && min !== 0)) return null;
+  return h * 60 + min;
+}
+function activeSlot(schedule, now) {
+  var day = now.getDay(), minutes = now.getHours() * 60 + now.getMinutes();
+  for (var i = 0; i < schedule.length; i++) {
+    var s = schedule[i];
+    if (s.day !== day) continue;
+    var a = toMinutes(s.start), b = toMinutes(s.end);
+    if (a === null || b === null) continue;
+    if (minutes >= a && minutes < b) return s;
+  }
+  return null;
+}
+function shortTime(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+function classLockState(c, now) {
+  now = now || new Date();
+  var overrideActive = c.lock_mode !== 'schedule' && (c.lock_until === null || new Date(c.lock_until).getTime() > now.getTime());
+  if (overrideActive) {
+    var until = c.lock_until ? ' until ' + shortTime(c.lock_until) : '';
+    return c.lock_mode === 'locked' ? { locked: true, reason: 'Locked by teacher' + until } : { locked: false, reason: 'Unlocked by teacher' + until };
+  }
+  var slot = activeSlot(c.schedule || [], now);
+  return slot ? { locked: true, reason: 'Class time (' + slot.start + ' to ' + slot.end + ')' } : { locked: false, reason: 'Outside class time' };
+}
+function cleanSchedule(slots) {
+  return slots.map(function (s, i) {
+    var a = toMinutes(s.start), b = toMinutes(s.end);
+    if (!(s.day >= 0 && s.day <= 6)) throw new Error('Row ' + (i + 1) + ': choose a day.');
+    if (a === null || b === null) throw new Error('Row ' + (i + 1) + ': use times like 08:00.');
+    if (b <= a) throw new Error('Row ' + (i + 1) + ': the end time must be after the start time.');
+    return { day: s.day, start: String(s.start).trim().padStart(5, '0'), end: String(s.end).trim().padStart(5, '0') };
+  });
+}
+function cleanSites(lines) {
+  var out = [];
+  lines.forEach(function (raw) {
+    var s = raw.trim();
+    if (!s) return;
+    var bad = new Error('"' + s + '" is not a website address.');
+    if (/\s/.test(s) || s.indexOf('*') >= 0) throw bad;
+    var url;
+    try { url = new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s); } catch (e) { throw bad; }
+    if (url.hostname.indexOf('.') < 0) throw bad;
+    if (out.indexOf(s) < 0) out.push(s);
+  });
+  if (out.length > 20) throw new Error('Use at most 20 websites.');
+  return out;
+}
+
+// ---------------------------------------------------------------- server calls
+function authCall(path, body) {
+  return fetch(SUPABASE_URL + path, {
+    method: 'POST', headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (!r.ok) {
+        var m = j.error_description || j.msg || j.message || ('Error ' + r.status);
+        throw new Error(m === 'Invalid login credentials' ? 'Wrong email or password.' : m);
+      }
+      return j;
+    });
+  }, function () { throw new Error('No connection. Check the internet.'); });
+}
+function saveSession(j) {
+  session = { access_token: j.access_token, refresh_token: j.refresh_token, user_id: j.user.id,
+    expires_at: Math.floor(Date.now() / 1000) + (j.expires_in || 3600) };
+  store('classlock_session', JSON.stringify(session));
+}
+function ensureToken() {
+  if (!session) return Promise.reject(new Error('Not signed in.'));
+  if (session.expires_at - Math.floor(Date.now() / 1000) > 60) return Promise.resolve();
+  return authCall('/auth/v1/token?grant_type=refresh_token', { refresh_token: session.refresh_token }).then(saveSession, function (e) {
+    signOut(); throw e;
+  });
+}
+function api(method, path, body, headers) {
+  return ensureToken().then(function () {
+    var h = { apikey: ANON_KEY, Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' };
+    for (var k in (headers || {})) h[k] = headers[k];
+    return fetch(SUPABASE_URL + '/rest/v1' + path, { method: method, headers: h, body: body === undefined ? undefined : JSON.stringify(body) });
+  }).then(function (r) {
+    return r.text().then(function (text) {
+      var data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (e) { /* no body */ }
+      if (!r.ok) throw new Error((data && data.message) || ('Error ' + r.status));
+      return data;
+    });
+  });
+}
+function signOut() {
+  session = null; teacher = null; store('classlock_session', null);
+  clearInterval(timer); location.hash = ''; showLogin();
+}
+
+// ---------------------------------------------------------------- login
+function showLogin(error) {
+  clearInterval(timer);
+  app.innerHTML =
+    '<div class="login"><form class="card" id="loginForm">' +
+    '<div><h1>ClassLock</h1><p class="muted">Teacher panel. Sign in with your teacher email.</p></div>' +
+    '<input class="full" id="email" type="email" placeholder="Email" autocomplete="username" required>' +
+    '<input class="full" id="password" type="password" placeholder="Password" autocomplete="current-password" required>' +
+    '<div class="msg bad" id="loginError" ' + (error ? '' : 'hidden') + '>' + esc(error || '') + '</div>' +
+    '<button class="btn" id="loginBtn">Sign in</button></form></div>';
+  $('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    $('loginBtn').disabled = true; $('loginBtn').textContent = 'Signing in…'; $('loginError').hidden = true;
+    authCall('/auth/v1/token?grant_type=password', { email: $('email').value.trim(), password: $('password').value })
+      .then(function (j) { saveSession(j); return loadTeacher(); })
+      .then(route, function (err) {
+        session = null; store('classlock_session', null);
+        $('loginError').textContent = err.message; $('loginError').hidden = false;
+        $('loginBtn').disabled = false; $('loginBtn').textContent = 'Sign in';
+      });
+  });
+}
+function loadTeacher() {
+  return api('GET', '/teachers?select=id,full_name').then(function (rows) {
+    if (!rows || !rows.length) throw new Error('This account is not a teacher account.');
+    teacher = rows[0];
+  });
+}
+
+// ---------------------------------------------------------------- shell
+function shell(inner) {
+  app.innerHTML =
+    '<div class="bar"><div class="wrap"><a class="brand" href="#/classes">ClassLock</a><span class="grow"></span>' +
+    '<span class="muted">' + esc(teacher.full_name) + '</span><button class="btn ghost" data-act="signout">Sign out</button></div></div>' +
+    '<div class="wrap stack">' + inner + '</div>';
+}
+function setMsg(ok, text) {
+  var el = $('msg'); if (!el) return;
+  el.className = 'msg ' + (ok ? 'ok' : 'bad'); el.textContent = text; el.hidden = false;
+}
+
+// ---------------------------------------------------------------- classes page
+function showClasses() {
+  clearInterval(timer);
+  shell(
+    '<div><h1>Classes</h1><p class="muted">Each class has a code. Type it once in the ClassLock app on a laptop, and the laptop joins the class.</p></div>' +
+    '<section class="card"><div class="row"><div class="grow"><h2>All laptops <span id="total"></span></h2>' +
+    '<span class="muted">Locked laptops can only open Google Chrome on the class websites.</span></div>' +
+    '<button class="btn" data-act="lockAll">Lock all</button><button class="btn ghost" data-act="unlockAll">Unlock all</button></div></section>' +
+    '<form class="card row" id="newClass"><input class="full grow" id="className" placeholder="New class name, for example Grade 8 B" maxlength="100" required style="flex:1">' +
+    '<button class="btn">Create class</button></form>' +
+    '<div class="msg" id="msg" hidden></div><div id="list" class="muted">Loading…</div>');
+  $('newClass').addEventListener('submit', function (e) {
+    e.preventDefault();
+    api('POST', '/classes', { name: $('className').value.trim(), teacher_id: session.user_id })
+      .then(function () { $('className').value = ''; loadClasses(); }, function (err) { setMsg(false, err.message); });
+  });
+  loadClasses();
+  timer = setInterval(loadClasses, 10000);
+}
+function loadClasses() {
+  api('GET', '/classes?select=*,devices(id)&order=created_at.asc').then(function (rows) {
+    if (!$('list')) return;
+    var total = rows.reduce(function (n, c) { return n + c.devices.length; }, 0);
+    $('total').textContent = '(' + total + ')';
+    if (!rows.length) { $('list').textContent = 'No classes yet. Create your first class above.'; return; }
+    $('list').className = 'grid g3';
+    $('list').innerHTML = rows.map(function (c) {
+      var st = classLockState(c);
+      return '<div class="card classcard" data-open="' + esc(c.id) + '"><div class="row"><h2 class="grow">' + esc(c.name) + '</h2>' +
+        '<span class="badge ' + (st.locked ? 'locked' : 'open') + '">' + (st.locked ? 'Locked' : 'Unlocked') + '</span></div>' +
+        '<span class="muted">' + esc(st.reason) + '</span><div class="row"><span>Code: <b style="font-family:Consolas,monospace;letter-spacing:.15em">' +
+        esc(c.join_code) + '</b></span><span class="grow"></span><span class="muted">' + c.devices.length + ' laptops</span></div></div>';
+    }).join('');
+  }, function (err) { setMsg(false, err.message); });
+}
+function setAll(locked) {
+  var mode = locked ? 'locked' : 'unlocked';
+  api('PATCH', '/classes?teacher_id=eq.' + session.user_id, { lock_mode: mode, lock_until: null })
+    .then(function () { return api('PATCH', '/devices?lock_mode=neq.class', { lock_mode: 'class' }); })
+    .then(function () {
+      setMsg(true, locked ? 'All laptops are locking now (within 10 seconds).' : 'All laptops are unlocking now (within 10 seconds).');
+      loadClasses();
+    }, function (err) { setMsg(false, err.message); });
+}
+
+// ---------------------------------------------------------------- class page
+function showClass(id) {
+  clearInterval(timer);
+  view = { classId: id, editorsReady: false, schedule: [], overrideFor: 'forever', cls: null, devices: [] };
+  var dayOptions = DAYS.map(function (d, n) { return '<option value="' + n + '">' + d + '</option>'; }).join('');
+  view.dayOptions = dayOptions;
+  shell(
+    '<div class="row"><a href="#/classes" class="muted">← Classes</a><h1 id="cname" class="grow"></h1>' +
+    '<button class="btn danger" data-act="delClass">Delete class</button></div><div class="msg" id="msg" hidden></div>' +
+    '<div class="grid cols3"><section class="card"><h2>Join code</h2><p class="code" id="code"></p>' +
+    '<span class="muted">Type this code one time in the ClassLock window on each laptop.</span>' +
+    '<div><button class="btn ghost" data-act="newCode">Make new code</button></div></section>' +
+    '<section class="card"><div class="row"><h2>Lock</h2><span id="lockBadge" class="badge"></span><span class="muted" id="lockReason"></span></div>' +
+    '<span class="muted">Locked laptops show only full-screen Chrome on the websites below. Installing apps is blocked all the time.</span>' +
+    '<div class="row"><button class="btn" data-act="lockNow">Lock now</button><button class="btn ghost" data-act="unlockNow">Unlock now</button>' +
+    '<select id="overrideFor"><option value="forever">until I change it</option><option value="1h">for 1 hour</option><option value="today">until the end of today</option></select>' +
+    '<button class="btn ghost" id="followBtn" data-act="followTimes" hidden>Follow class times again</button></div></section></div>' +
+    '<div class="grid cols2"><section class="card"><h2>Allowed websites</h2>' +
+    '<span class="muted">One per line. The first one opens when Chrome starts. <b>example.com</b> also allows its subdomains. If a site needs Google sign-in, also add <b>accounts.google.com</b>.</span>' +
+    '<textarea id="sites" placeholder="code.org"></textarea><div class="msg bad" id="noSites" hidden>No websites yet. Locked laptops cannot open any website.</div>' +
+    '<div><button class="btn" data-act="saveSites">Save websites</button></div></section>' +
+    '<section class="card"><h2>Class times</h2><span class="muted">Laptops lock automatically during these times (laptop clock).</span>' +
+    '<div id="sched" class="stack" style="gap:8px"></div><div class="row">' +
+    '<button class="btn ghost" data-act="addTime">Add time</button><button class="btn ghost" data-act="weekdays">Monday to Friday, 08:00 to 14:00</button>' +
+    '<button class="btn" data-act="saveTimes">Save class times</button></div></section></div>' +
+    '<section class="card"><div class="row"><h2>Laptops</h2><span class="muted" id="devCount"></span></div><div id="devBody"></div></section>');
+  $('overrideFor').addEventListener('change', function () { view.overrideFor = this.value; });
+  $('sites').addEventListener('input', function () { $('noSites').hidden = this.value.trim() !== ''; });
+  loadClass();
+  timer = setInterval(loadClass, 5000);
+}
+function loadClass() {
+  var id = view.classId;
+  Promise.all([
+    api('GET', '/classes?select=*&id=eq.' + encodeURIComponent(id)),
+    api('GET', '/devices?select=' + DEVICE_COLUMNS + '&class_id=eq.' + encodeURIComponent(id) + '&order=hostname.asc')
+  ]).then(function (res) {
+    if (view.classId !== id || !$('cname')) return;
+    if (!res[0].length) { app.querySelector('.wrap.stack').innerHTML = '<p>Class not found.</p><a href="#/classes">Back to classes</a>'; clearInterval(timer); return; }
+    view.cls = res[0][0]; view.devices = res[1];
+    paintClass();
+  }, function (err) { setMsg(false, err.message); });
+}
+function lastSeen(iso) {
+  if (!iso) return { online: false, text: 'Never' };
+  var s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s <= ONLINE_SECONDS) return { online: true, text: 'Online' };
+  if (s < 3600) return { online: false, text: Math.round(s / 60) + ' min ago' };
+  if (s < 86400) return { online: false, text: Math.round(s / 3600) + ' h ago' };
+  return { online: false, text: new Date(iso).toLocaleDateString() };
+}
+function paintClass() {
+  var c = view.cls, st = classLockState(c);
+  $('cname').textContent = c.name;
+  $('code').textContent = c.join_code;
+  $('lockBadge').className = 'badge ' + (st.locked ? 'locked' : 'open');
+  $('lockBadge').textContent = st.locked ? 'Locked now' : 'Unlocked now';
+  $('lockReason').textContent = st.reason;
+  $('followBtn').hidden = c.lock_mode === 'schedule';
+  if (!view.editorsReady) {
+    view.editorsReady = true;
+    $('sites').value = (c.allowed_sites || []).join('\n');
+    $('noSites').hidden = $('sites').value.trim() !== '';
+    view.schedule = (c.schedule || []).map(function (s) { return { day: s.day, start: s.start, end: s.end }; });
+    paintSchedule();
+  }
+  var active = document.activeElement;
+  if (active && active.tagName === 'SELECT' && $('devBody').contains(active)) return; // do not close an open menu
+  var n = 0; view.devices.forEach(function (d) { if (lastSeen(d.last_seen).online) n++; });
+  $('devCount').textContent = n + ' of ' + view.devices.length + ' online · refreshes every 5 seconds';
+  if (!view.devices.length) {
+    $('devBody').innerHTML = '<span class="muted">No laptops yet. Install ClassLock on a laptop, then type the code ' + esc(c.join_code) + ' in the ClassLock window.</span>';
+    return;
+  }
+  $('devBody').innerHTML = '<div style="overflow-x:auto"><table><thead><tr><th>Laptop</th><th>Connection</th><th>State</th><th>Rule for this laptop</th><th></th></tr></thead><tbody>' +
+    view.devices.map(function (d) {
+      var seen = lastSeen(d.last_seen);
+      var admin = d.agent_version && /\sadmin$/.test(d.agent_version);
+      return '<tr><td><b>' + esc(d.hostname) + '</b></td><td><span class="dot ' + (seen.online ? 'on' : '') + '"></span>' + esc(seen.text) + '</td>' +
+        '<td>' + (d.is_locked ? 'Locked' : 'Unlocked') +
+        (admin ? '<span class="warn">Admin Windows account: locked in class, but can remove ClassLock when unlocked.</span>' : '') + '</td>' +
+        '<td><select data-dev-mode="' + esc(d.id) + '">' +
+        ['class|Same as class', 'locked|Always locked', 'unlocked|Always unlocked'].map(function (o) {
+          var p = o.split('|'); return '<option value="' + p[0] + '"' + (d.lock_mode === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
+        }).join('') + '</select></td>' +
+        '<td style="text-align:right"><button class="link" data-remove="' + esc(d.id) + '" data-name="' + esc(d.hostname) + '">Remove</button></td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+function paintSchedule() {
+  var host = $('sched');
+  if (!view.schedule.length) { host.innerHTML = '<span class="muted">No class times. Laptops lock only when you press Lock now.</span>'; return; }
+  host.innerHTML = view.schedule.map(function (s, i) {
+    return '<div class="row"><select data-i="' + i + '" data-f="day">' + view.dayOptions.replace('value="' + s.day + '"', 'value="' + s.day + '" selected') + '</select>' +
+      '<input type="time" data-i="' + i + '" data-f="start" value="' + esc(s.start) + '"><span class="muted">to</span>' +
+      '<input type="time" data-i="' + i + '" data-f="end" value="' + esc(s.end) + '">' +
+      '<button class="link" data-del-time="' + i + '">Remove</button></div>';
+  }).join('');
+}
+function updateClass(patch, okText) {
+  return api('PATCH', '/classes?id=eq.' + encodeURIComponent(view.classId), patch).then(function () {
+    setMsg(true, okText); loadClass(); return true;
+  }, function (err) { setMsg(false, err.message); return false; });
+}
+function overrideUntil() {
+  if (view.overrideFor === '1h') return new Date(Date.now() + 3600000).toISOString();
+  if (view.overrideFor === 'today') { var e = new Date(); e.setHours(23, 59, 0, 0); return e.toISOString(); }
+  return null;
+}
+function setClassMode(mode) {
+  var text = mode === 'locked' ? 'Laptops are locking now.' : mode === 'unlocked' ? 'Laptops are unlocking now.' : 'Laptops follow the schedule again.';
+  updateClass({ lock_mode: mode, lock_until: mode === 'schedule' ? null : overrideUntil() }, text);
+}
+
+// ---------------------------------------------------------------- clicks
+document.addEventListener('click', function (e) {
+  var t = e.target.closest('[data-act],[data-open],[data-remove],[data-del-time]');
+  if (!t) return;
+  if (t.dataset.open) { location.hash = '#/class/' + t.dataset.open; return; }
+  if (t.dataset.remove) {
+    if (!confirm('Remove ' + t.dataset.name + ' from this class? It unlocks until someone types a class code on it again.')) return;
+    api('DELETE', '/devices?id=eq.' + encodeURIComponent(t.dataset.remove)).then(loadClass, function (err) { setMsg(false, err.message); });
+    return;
+  }
+  if (t.dataset.delTime !== undefined) { view.schedule.splice(Number(t.dataset.delTime), 1); paintSchedule(); return; }
+  switch (t.dataset.act) {
+    case 'signout': signOut(); break;
+    case 'lockAll': setAll(true); break;
+    case 'unlockAll': setAll(false); break;
+    case 'lockNow': setClassMode('locked'); break;
+    case 'unlockNow': setClassMode('unlocked'); break;
+    case 'followTimes': setClassMode('schedule'); break;
+    case 'newCode':
+      if (confirm('Make a new join code? The old code stops working. Laptops already in the class stay in it.'))
+        updateClass({ join_code: randomCode() }, 'New join code made.');
+      break;
+    case 'delClass':
+      if (confirm('Delete the class "' + view.cls.name + '"? All its laptops are removed from the panel and unlock.'))
+        api('DELETE', '/classes?id=eq.' + encodeURIComponent(view.classId)).then(function () { location.hash = '#/classes'; }, function (err) { setMsg(false, err.message); });
+      break;
+    case 'saveSites':
+      try {
+        var sites = cleanSites($('sites').value.split('\n'));
+        updateClass({ allowed_sites: sites }, 'Websites saved. Laptops get them within 10 seconds.').then(function (ok) { if (ok) $('sites').value = sites.join('\n'); });
+      } catch (err) { setMsg(false, err.message); }
+      break;
+    case 'saveTimes':
+      try {
+        var clean = cleanSchedule(view.schedule);
+        updateClass({ schedule: clean }, 'Class times saved.').then(function (ok) { if (ok) { view.schedule = clean; paintSchedule(); } });
+      } catch (err) { setMsg(false, err.message); }
+      break;
+    case 'addTime': view.schedule.push({ day: 1, start: '08:00', end: '14:00' }); paintSchedule(); break;
+    case 'weekdays':
+      view.schedule = [1, 2, 3, 4, 5].map(function (d) { return { day: d, start: '08:00', end: '14:00' }; }); paintSchedule(); break;
+  }
+});
+function onField(e) {
+  var t = e.target;
+  if (t.dataset && t.dataset.devMode) {
+    api('PATCH', '/devices?id=eq.' + encodeURIComponent(t.dataset.devMode), { lock_mode: t.value }).then(loadClass, function (err) { setMsg(false, err.message); });
+  } else if (t.dataset && t.dataset.f !== undefined) {
+    var row = view.schedule[Number(t.dataset.i)];
+    if (row) row[t.dataset.f] = t.dataset.f === 'day' ? Number(t.value) : t.value;
+  }
+}
+document.addEventListener('change', onField);
+document.addEventListener('input', function (e) { if (e.target.type === 'time') onField(e); });
+
+// ---------------------------------------------------------------- routing
+function route() {
+  if (!session || !teacher) { showLogin(); return; }
+  var m = /^#\/class\/([0-9a-f-]{36})$/i.exec(location.hash);
+  if (m) showClass(m[1]); else showClasses();
+}
+window.addEventListener('hashchange', route);
+
+(function start() {
+  var saved = store('classlock_session');
+  if (saved) { try { session = JSON.parse(saved); } catch (e) { session = null; } }
+  if (!session) { showLogin(); return; }
+  loadTeacher().then(route, function () { session = null; store('classlock_session', null); showLogin(); });
+})();
+</script>
+</body>
+</html>
